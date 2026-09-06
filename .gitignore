@@ -1,0 +1,4 @@
+node_modules/
+.expo/
+backend/venv/
+backend/__pycache__/
