@@ -6,3 +6,5 @@ sqlalchemy
 aiosqlite
 fakeredis
 redis
+fuzzywuzzy
+python-Levenshtein
