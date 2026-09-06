@@ -4,3 +4,5 @@ httpx
 pydantic
 sqlalchemy
 aiosqlite
+fakeredis
+redis
