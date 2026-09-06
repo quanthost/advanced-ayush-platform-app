@@ -127,7 +127,7 @@ export default function AYUSHDualPortal() {
     if (!note.trim()) return;
     setParserLoading(true);
     try {
-      const response = await fetch('http://10.197.104.162:8000/api/v1/emr/process', {
+      const response = await fetch('https://ayush-backend-api.onrender.com/api/v1/emr/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ abha_id: 'PATIENT-1234', doctor_note: note })

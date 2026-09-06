@@ -21,3 +21,17 @@ class PatientEMR(Base):
 async def init_models():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        from sqlalchemy import Column, Integer, String, Text, DateTime
+from datetime import datetime
+from database import Base
+
+class PatientEncounter(Base):
+    __tablename__ = "patient_encounters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    abha_id = Column(String, index=True)
+    chief_complaint = Column(String)
+    hpi = Column(Text)  # History of Present Illness (SOCRATES framework)
+    ayush_profile = Column(Text)  # JSON string storing Prakriti, Vikriti, etc.
+    document_summary = Column(Text)  # OCR extracted notes and timelines
+    created_at = Column(DateTime, default=datetime.utcnow)

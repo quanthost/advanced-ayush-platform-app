@@ -125,3 +125,6 @@ async def register_new_abha(data: ABHARegistrationRequest):
             "records_count": 0
         }
     }
+from clinical_engine import router as clinical_router
+
+app.include_router(clinical_router)

@@ -8,3 +8,5 @@ fakeredis
 redis
 fuzzywuzzy
 python-Levenshtein
+cryptography
+python-dotenv
