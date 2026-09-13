@@ -128,3 +128,22 @@ async def register_new_abha(data: ABHARegistrationRequest):
 from clinical_engine import router as clinical_router
 
 app.include_router(clinical_router)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from ai_triage_engine import router as triage_router
+from terminology_engine import router as terminology_router
+from telecom_engine import router as telecom_router
+
+app = FastAPI(title="Binary Brains AYUSH Clinical Gateway")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(triage_router)
+app.include_router(terminology_router)
+app.include_router(telecom_router)
