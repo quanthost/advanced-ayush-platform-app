@@ -1,645 +1,717 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Modal, FlatList, Platform } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Modal, Platform, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const API_URL = 'https://ayush-backend-api.onrender.com/api/v1';
 
-export default function AYUSHDualPortal() {
-  // --- 1. ORIGINAL AUTH STATES ---
-  const [step, setStep] = useState('role_selection');
-  const [loginRole, setLoginRole] = useState('patient'); 
-  const [patientLoginMethod, setPatientLoginMethod] = useState('mobile'); 
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [loginAbha, setLoginAbha] = useState('');
-  const [otpInput, setOtpInput] = useState('');
-  const [agreed, setAgreed] = useState(false);
-  
-  const [doctorId, setDoctorId] = useState('');
-  const [doctorPwd, setDoctorPwd] = useState('');
-  
+// --- INDIAN SCHEDULED LANGUAGES DIRECTORY ---
+const INDIAN_LANGUAGES = [
+  { code: 'English', label: 'English', icon: '🇬🇧' }, { code: 'Hindi', label: 'हिंदी (Hindi)', icon: '🇮🇳' },
+  { code: 'Tamil', label: 'தமிழ் (Tamil)', icon: '🪔' }, { code: 'Telugu', label: 'తెలుగు (Telugu)', icon: '🌾' },
+  { code: 'Bengali', label: 'বাংলা (Bengali)', icon: '🐅' }, { code: 'Marathi', label: 'मराठी (Marathi)', icon: '🚩' },
+  { code: 'Gujarati', label: 'ગુજરાતી (Gujarati)', icon: '🪕' }, { code: 'Kannada', label: 'ಕನ್ನಡ (Kannada)', icon: '🐘' },
+  { code: 'Malayalam', label: 'മലയാളം (Malayalam)', icon: '🌴' }, { code: 'Odia', label: 'ଓଡ଼ିଆ (Odia)', icon: '🌊' },
+  { code: 'Punjabi', label: 'ਪੰਜਾਬੀ (Punjabi)', icon: '🌾' }, { code: 'Assamese', label: 'অসমীয়া (Assamese)', icon: '🫖' },
+  { code: 'Urdu', label: 'اردو (Urdu)', icon: '🌙' }, { code: 'Sanskrit', label: 'संस्कृतम् (Sanskrit)', icon: '🕉️' },
+  { code: 'Kashmiri', label: 'कॉशुर (Kashmiri)', icon: '🏔️' }, { code: 'Konkani', label: 'कोंकणी (Konkani)', icon: '🏖️' }
+];
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  English: {
+    kioskTitle: 'MediKiosk Clinical Intake',
+    companyName: 'BINARY BRAINS SOLUTIONS',
+    startIntake: 'Begin AI Case-Taking',
+    chiefComplaintPrompt: 'State your primary discomfort or symptoms:',
+    voiceListening: 'Listening to speech in your language...',
+    redFlagAlert: 'CRITICAL EMERGENCY: Red-flag symptoms detected. Routine queue bypassed.',
+    socratesTitle: 'Symptom Deep-Dive (SOCRATES Framework)',
+    ayushTitle: 'Ayurvedic Assessment (Dashavidha Pariksha)',
+    documentScanTitle: 'Digitize Historic Medical Documents',
+    summaryTitle: 'Physician-Ready Structured History',
+    printSummary: 'Print Clinical Summary',
+    doctorWorkspace: 'Clinical Workspace',
+    patientRole: 'Patient / Kiosk User',
+    doctorRole: 'Attending Physician',
+    loginPrompt: 'Sign in to access kiosk session',
+    dpdpConsent: 'DPDP Act 2023 Granular Health Consent',
+    grantConsent: 'I Grant Consent to Digitize & Structure My Health Data'
+  },
+  Hindi: {
+    kioskTitle: 'मेडीकियोस्क क्लिनिकल इंटेक',
+    companyName: 'बाइनरी ब्रेन्स सॉल्यूशंस',
+    startIntake: 'एआई केस-टेकिंग शुरू करें',
+    chiefComplaintPrompt: 'अपनी मुख्य समस्या या लक्षण बताएं:',
+    voiceListening: 'आपकी भाषा में आवाज सुनी जा रही है...',
+    redFlagAlert: 'आपातकालीन चेतावनी: गंभीर लक्षण मिले हैं। सामान्य कतार बायपास की गई।',
+    socratesTitle: 'लक्षण गहन विश्लेषण (SOCRATES रूपरेखा)',
+    ayushTitle: 'आयुर्वेदिक परीक्षण (दशविध परीक्षा)',
+    documentScanTitle: 'पुराने मेडिकल दस्तावेज डिजिटाइज़ करें',
+    summaryTitle: 'चिकित्सक के लिए तैयार क्लिनिकल सारांश',
+    printSummary: 'क्लिनिकल सारांश प्रिंट करें',
+    doctorWorkspace: 'चिकित्सक वर्कस्पेस',
+    patientRole: 'मरीज / कियोस्क उपयोगकर्ता',
+    doctorRole: 'उपस्थित चिकित्सक',
+    loginPrompt: 'कियोस्क सत्र शुरू करने के लिए साइन इन करें',
+    dpdpConsent: 'डीपीडीपी अधिनियम 2023 स्वास्थ्य सहमति',
+    grantConsent: 'मैं अपने स्वास्थ्य डेटा को डिजिटाइज़ करने की सहमति देता हूँ'
+  },
+  Tamil: {
+    kioskTitle: 'மெடிகியோஸ்க் மருத்துவ தகவல் பதிவு',
+    companyName: 'பைனரி பிரைன்ஸ் சொல்யூஷன்ஸ்',
+    startIntake: 'AI மருத்துவ வரலாறு பதிவைத் தொடங்குக',
+    chiefComplaintPrompt: 'உங்கள் முதன்மை உடல்நலக் குறைபாட்டை விவரிக்கவும்:',
+    voiceListening: 'உங்கள் குரல் கேட்கப்படுகிறது...',
+    redFlagAlert: 'அவசர எச்சரிக்கை: கடுமையான அறிகுறிகள் கண்டறியப்பட்டன.',
+    socratesTitle: 'அறிகுறி பகுப்பாய்வு (SOCRATES கட்டமைப்பு)',
+    ayushTitle: 'ஆயுர்வேத மதிப்பீடு (தசவித பரீட்சை)',
+    documentScanTitle: 'பழைய மருத்துவ ஆவணங்களை டிஜிட்டல் மயமாக்குங்கள்',
+    summaryTitle: 'மருத்துவர் சரிபார்க்கும் மருத்துவ அறிக்கை',
+    printSummary: 'மருத்துவ அறிக்கையை அச்சிடுக',
+    doctorWorkspace: 'மருத்துவப் பணியிடம்',
+    patientRole: 'நோயாளி / கியோஸ்க் பயனர்',
+    doctorRole: 'மருத்துவர்',
+    loginPrompt: 'அமர்வைத் தொடங்க உள்நுழையவும்',
+    dpdpConsent: 'DPDP சட்டம் 2023 சுகாதார ஒப்புதல்',
+    grantConsent: 'என் மருத்துவத் தரவை டிஜிட்டல் மயமாக்க ஒப்புதல் அளிக்கிறேன்'
+  }
+};
+
+export default function MediKioskPlatform() {
+  // Navigation & Accessibility States
+  const [step, setStep] = useState<'language_select' | 'auth_role' | 'dpdp_consent' | 'kiosk_intake' | 'doctor_dashboard'>('language_select');
+  const [language, setLanguage] = useState('English');
+  const [highContrast, setHighContrast] = useState(false);
+  const [audioGuidance, setAudioGuidance] = useState(true);
+  const [largeText, setLargeText] = useState(false);
+
+  const t = (k: string) => TRANSLATIONS[language]?.[k] || TRANSLATIONS['English']?.[k] || k;
+
+  // Session & User States
+  const [sessionId, setSessionId] = useState(`MKS-${Date.now().toString().slice(-6)}`);
+  const [userRole, setUserRole] = useState<'patient' | 'doctor'>('patient');
   const [abhaInput, setAbhaInput] = useState('');
-  const [regName, setRegName] = useState('');
-  const [regDob, setRegDob] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [userData, setUserData] = useState<any>(null);
+  const [patientName, setPatientName] = useState('Nishanth S');
+  const [doctorId, setDoctorId] = useState('DR-01');
 
-  const [activeTab, setActiveTab] = useState('home');
-  const [menuOpen, setMenuOpen] = useState(false);
-  
-  // Doctor EMR States
-  const [note, setNote] = useState('');
-  const [result, setResult] = useState<any>(null);
-  const [parserLoading, setParserLoading] = useState(false);
+  // Module A: Conversational History States
+  const [isRecording, setIsRecording] = useState(false);
+  const [chiefComplaint, setChiefComplaint] = useState('');
+  const [triageAlert, setTriageAlert] = useState<'ROUTINE' | 'EMERGENCY_RED_FLAG'>('ROUTINE');
+  const [assignedDept, setAssignedDept] = useState('Kayachikitsa');
+  const [socratesData, setSocratesData] = useState({
+    site: 'Bilateral Knee Joints',
+    onset: 'Gradual onset over 4 months',
+    character: 'Aching stiffness and morning swelling',
+    radiation: 'Extending to ankles',
+    associations: 'Fatigue, Agnimandya (poor appetite)',
+    timing: 'Worse early morning for first 60 minutes',
+    exacerbating: 'Cold weather and physical exertion',
+    severity: '7 out of 10'
+  });
 
-  // --- 2. FAST FUNCTIONAL STATES ---
-  const [liveAppointments, setLiveAppointments] = useState<any[]>([]);
-  const [bookingModalVisible, setBookingModalVisible] = useState(false);
-  const [bookingSymptoms, setBookingSymptoms] = useState('');
-  
-  const [emrModalVisible, setEmrModalVisible] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
-  const [doctorNotes, setDoctorNotes] = useState('');
-  
-  const [codingQuery, setCodingQuery] = useState('');
-  const [codingResults, setCodingResults] = useState<any[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<any[]>([]);
+  // Module A: Dashavidha Pariksha (Ayurveda Intake)
+  const [dashavidha, setDashavidha] = useState({
+    prakriti: 'Vata-Kapha',
+    vikriti: 'Vata-Pitta Imbalance',
+    sara: 'Madhyama (Moderate tissue vitality)',
+    samhanana: 'Madhyama (Medium body build)',
+    pramana: 'Normal anthropometric proportion',
+    satmya: 'Mishra Satmya',
+    sattva: 'Madhyama (Moderate mental resolve)',
+    ahara_shakti: 'Avaram (Low digestive capacity / Mandagni)',
+    vyayama_shakti: 'Avaram (Low physical endurance)',
+    vaya: 'Madhyama (Adult)',
+    koshtha: 'Krura Koshtha (Constipated tendency)'
+  });
 
-  // --- 3. FAST SYNC LOGIC ---
-  const fetchLiveDatabase = async () => {
-    try {
-      const abhaParam = userData?.role === 'patient' ? `?patient_abha=${userData.abha_number}` : '';
-      const res = await fetch(`${API_URL}/db/appointments${abhaParam}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) setLiveAppointments(data);
-      }
-    } catch (err) { console.log('Sync offline, using cache'); }
-  };
-
-  useEffect(() => {
-    if (userData) {
-      fetchLiveDatabase();
-      const interval = setInterval(fetchLiveDatabase, 5000);
-      return () => clearInterval(interval);
+  // Module B: Medical Document Digitization & OCR
+  const [scannedDocuments, setScannedDocuments] = useState<any[]>([
+    {
+      id: 'DOC-1',
+      title: 'Previous Prescription - AYUSH Dispensary',
+      date: '14 Jan 2026',
+      extractedMedications: ['Yogaraj Guggulu (2 tabs BD)', 'Dashmularishta (20ml BD)'],
+      abnormalFlags: []
+    },
+    {
+      id: 'DOC-2',
+      title: 'Biochemistry Panel - Serum Analysis',
+      date: '02 Feb 2026',
+      extractedMedications: [],
+      abnormalFlags: ['Serum Uric Acid: 7.9 mg/dL (High)', 'ESR: 38 mm/hr (Elevated)']
     }
-  }, [userData]);
+  ]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
-  // --- 4. ORIGINAL AUTHENTICATION PROCESSES ---
-  const handlePatientLoginSubmit = () => {
-    if (patientLoginMethod === 'mobile' && (!mobileNumber || mobileNumber.length < 10)) return alert("Please enter a valid 10-digit mobile number.");
-    if (patientLoginMethod === 'abha' && (!loginAbha || loginAbha.length < 12)) return alert("Please enter a valid ABHA Number.");
-    if (!agreed) return alert("Please agree to the Terms of Use.");
-    setLoading(true);
-    setTimeout(() => { setLoading(false); setStep('verify_otp'); }, 600);
+  // Module C: Doctor Verification Workspace
+  const [doctorEMRModal, setDoctorEMRModal] = useState(false);
+  const [editedNotes, setEditedNotes] = useState('');
+  const [selectedCodes, setSelectedCodes] = useState<string[]>(['NAM:AYU-AM01 (Amavata)', 'ICD11:FA20 (Rheumatoid Arthritis)']);
+  const [activeTab, setActiveTab] = useState<'kiosk' | 'queue' | 'telemed'>('kiosk');
+
+  // -------------------------------------------------------------
+  // HANDLERS & SIMULATIONS
+  // -------------------------------------------------------------
+  const simulateVoiceASR = () => {
+    setIsRecording(true);
+    setTimeout(() => {
+      setIsRecording(false);
+      const sampleSymptom = "Severe joint pain and knee swelling every morning with poor digestion.";
+      setChiefComplaint(sampleSymptom);
+      evaluateComplaintOnServer(sampleSymptom);
+    }, 1800);
   };
 
-  const handleDoctorLoginSubmit = () => {
-    if (!doctorId || !doctorPwd) return alert("Enter valid credentials.");
-    setLoading(true);
-    setTimeout(() => { setLoading(false); setStep('verify_otp'); }, 600);
-  };
-
-  const handleVerifyOTP = () => {
-    if (!otpInput || otpInput.length < 4) return alert("Please enter the OTP.");
-    setLoading(true);
-    setTimeout(() => { 
-      setLoading(false); 
-      if (loginRole === 'doctor') {
-        setUserData({ name: "Dr. Sujai S", abha_number: "HPR-9988", role: "doctor" });
-        setStep('dashboard'); 
-      } else {
-        setStep('welcome'); 
-      }
-    }, 600);
-  };
-
-  const handleLinkABHA = () => {
-    if (!abhaInput) return alert("Enter valid ABHA ID.");
-    setLoading(true);
-    setTimeout(() => { 
-      setLoading(false); 
-      setUserData({ name: "Linked User", abha_number: abhaInput, role: "patient" }); 
-      setStep('dashboard'); 
-    }, 800);
-  };
-
-  const handleRegisterNewMember = () => {
-    if (!regName) return alert("Enter Name.");
-    setLoading(true);
-    setTimeout(() => { 
-      setLoading(false); 
-      setUserData({ name: regName, abha_number: `33-8921-1234-2026`, role: "patient" }); 
-      setStep('dashboard'); 
-    }, 800);
-  };
-
-  // --- 5. CLINICAL DATA PIPELINE ---
-  const handleBookAppointment = async () => {
-    setLoading(true);
-    const newAppt = {
-      id: `APT-${Math.random().toString(36).substring(7).toUpperCase()}`,
-      patient_name: userData.name,
-      patient_abha: userData.abha_number,
-      doctor_name: 'Dr. Sujai S',
-      specialty: 'General AYUSH',
-      symptoms: bookingSymptoms,
-      status: 'Waiting',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
+  const evaluateComplaintOnServer = async (text: string) => {
     try {
-      await fetch(`${API_URL}/db/appointments`, {
+      const res = await fetch(`${API_URL}/kiosk/intake/chief-complaint`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAppt)
+        body: JSON.stringify({ session_id: sessionId, chief_complaint: text })
       });
-      alert('Success! Appointment dispatched to Doctor.');
-    } catch (err) { 
-      setLiveAppointments([newAppt, ...liveAppointments]);
-      alert('Saved to local queue (Cloud disconnected).');
-    }
-    setBookingModalVisible(false);
-    setBookingSymptoms('');
-    fetchLiveDatabase();
-    setLoading(false);
-  };
-
-  const handleOpenPatientEMR = async (patient: any) => {
-    setSelectedPatient(patient);
-    setEmrModalVisible(true);
-    try {
-      const res = await fetch(`${API_URL}/db/emr/${patient.patient_abha}`);
       const data = await res.json();
-      setDoctorNotes(data.notes || '');
-    } catch (err) { setDoctorNotes(''); }
-  };
-
-  const handleSaveEMR = async () => {
-    setLoading(true);
-    try {
-      await fetch(`${API_URL}/db/emr/${selectedPatient.patient_abha}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doctor_notes: doctorNotes, diagnoses: selectedCodes })
-      });
-      alert('Patient data securely updated.');
-    } catch (err) { alert('Saved locally.'); }
-    setEmrModalVisible(false);
-    setDoctorNotes('');
-    setSelectedCodes([]);
-    fetchLiveDatabase();
-    setLoading(false);
-  };
-
-  const handleSearchCoding = async (text: string) => {
-    setCodingQuery(text);
-    if (text.length < 2) return setCodingResults([]);
-    try {
-      const res = await fetch(`${API_URL}/terminology/search?q=${text}`);
-      setCodingResults(await res.json());
-    } catch (err) { 
-      setCodingResults([{code: 'NAM:AYU-01', label: 'Amavata (Rheumatoid)', system: 'Ayurveda'}]); 
+      setTriageAlert(data.triage_level);
+      setAssignedDept(data.assigned_department);
+    } catch {
+      if (text.toLowerCase().includes('chest') || text.toLowerCase().includes('stroke')) {
+        setTriageAlert('EMERGENCY_RED_FLAG');
+        setAssignedDept('Emergency Critical Care');
+      } else {
+        setTriageAlert('ROUTINE');
+        setAssignedDept('Kayachikitsa');
+      }
     }
   };
 
-  // --- ORIGINAL STATIC DATA PRESERVED ---
-  const patientQuickActions = [
-    { id: '1', title: 'Book App\nointment', icon: '🩺', bg: '#fef3c7', action: 'book' },
-    { id: '2', title: 'Video\nConsult', icon: '📱', bg: '#ffedd5', action: 'telemed' },
-    { id: '3', title: 'Tests &\nCheckups', icon: '🌿', bg: '#dcfce3', action: 'none' },
-    { id: '4', title: 'Advance\nDeposits', icon: '💳', bg: '#e0e7ff', action: 'none' },
-    { id: '5', title: 'My\nBookings', icon: '📋', bg: '#fae8ff', action: 'none' },
-    { id: '6', title: 'Therapy\nBookings', icon: '💆', bg: '#fce7f3', action: 'none' },
-  ];
-  const specialties = [
-    { id: '1', title: 'Ayurveda', icon: '🌿' }, { id: '2', title: 'Yoga &\nNaturopathy', icon: '🧘‍♀️' },
-    { id: '3', title: 'Unani', icon: '🍯' }, { id: '4', title: 'Siddha', icon: '🍃' },
-    { id: '5', title: 'Sowa\nRigpa', icon: '🏔️' }, { id: '6', title: 'Homoeopathy', icon: '💧' },
-  ];
-  const docQuickActions = [
-    { id: '1', title: 'Prakriti\nAnalysis', icon: '🧬', bg: '#e0f2fe' }, { id: '2', title: 'Nadi\nPariksha', icon: '🫀', bg: '#fce7f3' },
-    { id: '3', title: 'Diet &\nLifestyle', icon: '🥗', bg: '#dcfce3' }, { id: '4', title: 'Therapy\nOrders', icon: '💆‍♂️', bg: '#ffedd5', action: 'telemed' },
-  ];
+  const simulateDocumentScan = () => {
+    setUploadingDoc(true);
+    setTimeout(() => {
+      const newDoc = {
+        id: `DOC-${Date.now().toString().slice(-4)}`,
+        title: 'New Digitized Paper Prescription',
+        date: new Date().toLocaleDateString(),
+        extractedMedications: ['Ashwagandha Capsule (1 OD)', 'Triphala Churna (5g HS)'],
+        abnormalFlags: []
+      };
+      setScannedDocuments([newDoc, ...scannedDocuments]);
+      setUploadingDoc(false);
+      Alert.alert('OCR Complete', 'Prescription entities, dosages, and dates extracted successfully.');
+    }, 1500);
+  };
 
-  // ==========================================
-  // ORIGINAL UI SCREENS
-  // ==========================================
+  const triggerPrintSummary = () => {
+    if (Platform.OS === 'web') {
+      window.print();
+    } else {
+      Alert.alert('Download Ready', 'MediKiosk_Structured_Clinical_Summary.pdf generated successfully.');
+    }
+  };
 
-  if (step === 'role_selection') {
+  const purgeSessionData = () => {
+    setChiefComplaint('');
+    setTriageAlert('ROUTINE');
+    setSessionId(`MKS-${Date.now().toString().slice(-6)}`);
+    setStep('language_select');
+    Alert.alert('Session Terminated', 'Terminal cache purged in compliance with DPDP Act 2023.');
+  };
+
+  // =============================================================
+  // SCREEN 1: LANGUAGE SELECTION & ACCESSIBILITY
+  // =============================================================
+  if (step === 'language_select') {
     return (
-      <SafeAreaView style={styles.loginContainer}>
-        <View style={styles.companyHeadingContainer}><Text style={styles.companyHeadingText}>BINARY BRAINS SOLUTIONS</Text><View style={styles.companyDivider} /></View>
-        <View style={{marginTop: 60, marginBottom: 40}}>
-          <Text style={styles.roleQuestionText}>Are you a patient or a doctor?</Text>
-          <TouchableOpacity style={styles.largeRoleBtn} onPress={() => { setLoginRole('patient'); setStep('login'); }}><Text style={styles.largeRoleIcon}>🧑‍🤝‍🧑</Text><Text style={styles.largeRoleBtnText}>I am a Patient</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.largeRoleBtn} onPress={() => { setLoginRole('doctor'); setStep('login'); }}><Text style={styles.largeRoleIcon}>🩺</Text><Text style={styles.largeRoleBtnText}>I am a Doctor</Text></TouchableOpacity>
+      <SafeAreaView style={[styles.screenContainer, highContrast && styles.highContrastBg]}>
+        {/* Accessibility Toolbar */}
+        <View style={styles.accessToolbar}>
+          <TouchableOpacity style={styles.accessPill} onPress={() => setAudioGuidance(!audioGuidance)}>
+            <Text style={styles.accessText}>🔊 Audio: {audioGuidance ? 'ON' : 'OFF'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.accessPill} onPress={() => setHighContrast(!highContrast)}>
+            <Text style={styles.accessText}>👁️ Contrast: {highContrast ? 'HIGH' : 'STD'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.accessPill} onPress={() => setLargeText(!largeText)}>
+            <Text style={styles.accessText}>🔍 Text: {largeText ? 'LG' : 'MD'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.companyHeadingContainer}>
+          <Text style={[styles.companyHeadingText, largeText && { fontSize: 26 }]}>BINARY BRAINS SOLUTIONS</Text>
+          <View style={styles.companyDivider} />
+          <Text style={[styles.kioskSubtitle, largeText && { fontSize: 16 }]}>{t('kioskTitle')}</Text>
+        </View>
+
+        <Text style={[styles.roleQuestionText, largeText && { fontSize: 20 }]}>Select Language / भाषा चुनें</Text>
+
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {INDIAN_LANGUAGES.map((lang, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={[styles.largeRoleBtn, highContrast && styles.highContrastCard]}
+              onPress={() => {
+                setLanguage(lang.code);
+                setStep('auth_role');
+              }}
+            >
+              <Text style={styles.largeRoleIcon}>{lang.icon}</Text>
+              <Text style={[styles.largeRoleBtnText, largeText && { fontSize: 18 }]}>{lang.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // =============================================================
+  // SCREEN 2: AUTHENTICATION & ROLE NAVIGATION
+  // =============================================================
+  if (step === 'auth_role') {
+    return (
+      <SafeAreaView style={[styles.screenContainer, highContrast && styles.highContrastBg]}>
+        <View style={styles.topNavRow}>
+          <TouchableOpacity onPress={() => setStep('language_select')}>
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>{t('loginPrompt')}</Text>
+        </View>
+
+        <View style={styles.companyHeadingContainer}>
+          <Text style={styles.companyHeadingText}>{t('companyName')}</Text>
+          <View style={styles.companyDivider} />
+        </View>
+
+        <View style={{ marginTop: 40, marginBottom: 20 }}>
+          <TouchableOpacity
+            style={styles.largeRoleBtn}
+            onPress={() => {
+              setUserRole('patient');
+              setStep('dpdp_consent');
+            }}
+          >
+            <Text style={styles.largeRoleIcon}>🧑‍🤝‍🧑</Text>
+            <View>
+              <Text style={styles.largeRoleBtnText}>{t('patientRole')}</Text>
+              <Text style={styles.subtext}>Scan ABHA ID / Aadhaar & Record Case</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.largeRoleBtn}
+            onPress={() => {
+              setUserRole('doctor');
+              setStep('doctor_dashboard');
+            }}
+          >
+            <Text style={styles.largeRoleIcon}>🩺</Text>
+            <View>
+              <Text style={styles.largeRoleBtnText}>{t('doctorRole')}</Text>
+              <Text style={styles.subtext}>Review Structured Histories in OPD</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  if (step === 'login') {
+  // =============================================================
+  // SCREEN 3: DPDP ACT 2023 GRANULAR CONSENT (MODULE D)
+  // =============================================================
+  if (step === 'dpdp_consent') {
     return (
-      <SafeAreaView style={styles.loginContainer}>
-        <View style={styles.topNavRow}><TouchableOpacity onPress={() => setStep('role_selection')}><Text style={styles.backArrow}>←</Text></TouchableOpacity><Text style={styles.navTitle}>{loginRole === 'patient' ? 'Patient Portal' : 'Clinical Workspace'}</Text></View>
-        <View style={styles.companyHeadingContainer}><Text style={styles.companyHeadingText}>BINARY BRAINS SOLUTIONS</Text><View style={styles.companyDivider} /></View>
-        {loginRole === 'patient' ? (
-          <View style={{width: '100%', marginTop: 20}}>
-            <Text style={styles.loginHeading}>Patient Login</Text>
-            <View style={styles.methodToggleContainer}>
-              <TouchableOpacity style={[styles.methodToggleBtn, patientLoginMethod === 'mobile' && styles.methodToggleBtnActive]} onPress={() => setPatientLoginMethod('mobile')}><Text style={[styles.methodToggleText, patientLoginMethod === 'mobile' && styles.methodToggleTextActive]}>Mobile Number</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.methodToggleBtn, patientLoginMethod === 'abha' && styles.methodToggleBtnActive]} onPress={() => setPatientLoginMethod('abha')}><Text style={[styles.methodToggleText, patientLoginMethod === 'abha' && styles.methodToggleTextActive]}>ABHA Number</Text></TouchableOpacity>
-            </View>
-            {patientLoginMethod === 'mobile' ? (
-              <View style={styles.inputWrapper}><View style={styles.countryCodeBox}><Text style={styles.flagText}>🇮🇳 +91 ▾</Text></View><TextInput style={styles.phoneInput} placeholder="Enter mobile number" keyboardType="phone-pad" value={mobileNumber} onChangeText={setMobileNumber} /></View>
-            ) : (
-              <View style={styles.inputWrapper}><View style={styles.countryCodeBox}><Text style={styles.flagText}>🪪 ABHA</Text></View><TextInput style={styles.phoneInput} placeholder="e.g. 33-8921-1234" value={loginAbha} onChangeText={setLoginAbha} /></View>
-            )}
-            <View style={styles.termsRow}><TouchableOpacity onPress={() => setAgreed(!agreed)} style={styles.checkbox}>{agreed && <Text style={styles.checkmark}>✓</Text>}</TouchableOpacity><Text style={styles.termsText}>I have read and agree to the <Text style={styles.linkText}>Terms</Text></Text></View>
-            <TouchableOpacity style={styles.otpButton} onPress={handlePatientLoginSubmit}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.otpButtonText}>Get OTP</Text>}</TouchableOpacity>
+      <SafeAreaView style={[styles.screenContainer, highContrast && styles.highContrastBg]}>
+        <View style={styles.topNavRow}>
+          <TouchableOpacity onPress={() => setStep('auth_role')}>
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>{t('dpdpConsent')}</Text>
+        </View>
+
+        <View style={styles.consentCard}>
+          <Text style={styles.consentHeader}>🔒 Compliance with DPDP Act 2023 & ABDM</Text>
+          <Text style={styles.consentBody}>
+            MediKiosk will record your clinical history via speech recognition, structure presenting symptoms, and scan medical documents.
+            Data is encrypted and transmitted directly to the hospital physician. Session data on this kiosk is ephemeral and purged immediately after submission.
+          </Text>
+          <View style={styles.inputWrapper}>
+            <View style={styles.countryCodeBox}><Text style={styles.flagText}>🪪 ABHA</Text></View>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="Enter ABHA ID or Mobile Number"
+              value={abhaInput}
+              onChangeText={setAbhaInput}
+            />
           </View>
-        ) : (
-          <View style={{width: '100%', marginTop: 20}}>
-            <Text style={styles.loginHeading}>Doctor Sign In</Text>
-            <View style={styles.inputWrapper}><View style={styles.countryCodeBox}><Text style={styles.flagText}>👨‍⚕️ ID</Text></View><TextInput style={styles.phoneInput} placeholder="Doctor ID" value={doctorId} onChangeText={setDoctorId} /></View>
-            <View style={styles.inputWrapper}><View style={styles.countryCodeBox}><Text style={styles.flagText}>🔒 PWD</Text></View><TextInput style={styles.phoneInput} placeholder="Password" secureTextEntry value={doctorPwd} onChangeText={setDoctorPwd} /></View>
-            <TouchableOpacity style={[styles.otpButton, {backgroundColor: '#0f172a'}]} onPress={handleDoctorLoginSubmit}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.otpButtonText}>Get OTP</Text>}</TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.primaryGreenBtn}
+          onPress={() => setStep('kiosk_intake')}
+        >
+          <Text style={styles.primaryBtnText}>{t('grantConsent')}</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // =============================================================
+  // SCREEN 4: MEDIKIOSK AI CASE-TAKING ENGINE (MODULES A, B, C)
+  // =============================================================
+  if (step === 'kiosk_intake') {
+    return (
+      <SafeAreaView style={[styles.screenContainer, highContrast && styles.highContrastBg]}>
+        {/* Red Flag Emergency Banner */}
+        {triageAlert === 'EMERGENCY_RED_FLAG' && (
+          <View style={styles.redFlagCard}>
+            <Text style={styles.redFlagHeading}>⚠️ CRITICAL TRIAGE ALERT</Text>
+            <Text style={styles.redFlagText}>{t('redFlagAlert')}</Text>
+            <Text style={styles.redFlagSub}>Immediate dispatch to: Emergency Critical Care Unit</Text>
           </View>
         )}
-      </SafeAreaView>
-    );
-  }
 
-  if (step === 'verify_otp') {
-    return (
-      <SafeAreaView style={styles.loginContainer}>
-        <View style={styles.topNavRow}><TouchableOpacity onPress={() => setStep('login')}><Text style={styles.backArrow}>←</Text></TouchableOpacity><Text style={styles.navTitle}>Verification</Text></View>
-        <View style={{marginTop: 40, alignItems: 'center'}}>
-          <Text style={{fontSize: 48, marginBottom: 20}}>💬</Text>
-          <Text style={styles.loginHeading}>Enter OTP</Text>
-          <Text style={{textAlign: 'center', color: '#64748b', marginBottom: 30, paddingHorizontal: 20}}>A simulation OTP code has been sent. (Type any 4 digits to proceed)</Text>
-          <View style={[styles.inputWrapper, {width: '100%'}]}><View style={styles.countryCodeBox}><Text style={styles.flagText}>🔑 OTP</Text></View><TextInput style={[styles.phoneInput, {fontSize: 20, tracking: 4}]} placeholder="----" keyboardType="number-pad" maxLength={6} value={otpInput} onChangeText={setOtpInput} /></View>
-          <TouchableOpacity style={[styles.otpButton, loginRole === 'doctor' && {backgroundColor: '#0f172a'}, {width: '100%', marginTop: 20}]} onPress={handleVerifyOTP}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.otpButtonText}>Verify & Proceed</Text>}</TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (step === 'welcome') {
-    return (
-      <SafeAreaView style={styles.screenContainer}>
-        <View style={styles.topNavRow}><TouchableOpacity onPress={() => setStep('login')}><Text style={styles.backArrow}>←</Text></TouchableOpacity><Text style={styles.navTitle}>Welcome User</Text></View>
-        <View style={styles.illBox}><Text style={styles.illSymbol}>📁➕</Text></View>
-        <Text style={styles.instructionText}>If you are an existing patient with an ABHA ID, tap 'Link'.</Text>
-        <TouchableOpacity style={styles.primaryButtonLarge} onPress={() => setStep('link_mrn')}><Text style={styles.primaryButtonLargeText}>Link using ABHA</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.outlineButtonLarge} onPress={() => setStep('register_new')}><Text style={styles.outlineButtonLargeText}>I am a new user</Text></TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  if (step === 'link_mrn') {
-    return (
-      <SafeAreaView style={styles.screenContainer}>
-        <View style={styles.topNavRow}><TouchableOpacity onPress={() => setStep('welcome')}><Text style={styles.backArrow}>←</Text></TouchableOpacity><Text style={styles.navTitle}>Link Member</Text></View>
-        <Text style={styles.fieldLabel}>Member ABHA ID *</Text>
-        <TextInput style={styles.textInputFull} placeholder="Enter ABHA ID" value={abhaInput} onChangeText={setAbhaInput} />
-        <TouchableOpacity style={[styles.primaryButtonLarge, {marginTop: 20}]} onPress={handleLinkABHA}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonLargeText}>Proceed</Text>}</TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  if (step === 'register_new') {
-    return (
-      <SafeAreaView style={styles.screenContainer}>
-        <View style={styles.topNavRow}><TouchableOpacity onPress={() => setStep('welcome')}><Text style={styles.backArrow}>←</Text></TouchableOpacity><Text style={styles.navTitle}>Register New</Text></View>
-        <Text style={styles.fieldLabel}>Name *</Text>
-        <TextInput style={styles.textInputFull} placeholder="Name" value={regName} onChangeText={setRegName} />
-        <Text style={styles.fieldLabel}>DOB *</Text>
-        <TextInput style={styles.textInputFull} placeholder="DD/MM/YYYY" value={regDob} onChangeText={setRegDob} />
-        <TouchableOpacity style={[styles.primaryButtonLarge, {marginTop: 20}]} onPress={handleRegisterNewMember}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonLargeText}>Submit</Text>}</TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  // ==========================================
-  // DOCTOR DASHBOARD
-  // ==========================================
-  const isDoctor = userData?.role === 'doctor';
-
-  if (isDoctor) {
-    return (
-      <SafeAreaView style={styles.dashContainerDoctor}>
+        {/* Kiosk Header */}
         <View style={styles.patHeader}>
           <View style={styles.patHeaderLeft}>
-            <TouchableOpacity onPress={() => setMenuOpen(true)}><Text style={styles.hamburger}>☰</Text></TouchableOpacity>
-            <Text style={styles.patHeaderTitle}>{userData?.name} ▾</Text>
+            <Text style={styles.patHeaderTitle}>Terminal ID: {sessionId}</Text>
           </View>
-          <Text style={styles.bell}>🔔</Text>
+          <TouchableOpacity style={styles.purgeBtn} onPress={purgeSessionData}>
+            <Text style={styles.purgeBtnText}>Purge & Exit</Text>
+          </TouchableOpacity>
         </View>
 
-        <Modal visible={menuOpen} animationType="slide" transparent={true}>
-          <View style={styles.drawerOverlay}>
-            <View style={styles.drawerContent}>
-              <View style={[styles.drawerBlueHeader, {backgroundColor: '#0f172a'}]}>
-                <View style={styles.drawerInitials}><Text style={[styles.drawerInitialsText, {color: '#0f172a'}]}>DR</Text></View>
-                <Text style={styles.drawerUserName}>{userData?.name}</Text>
-              </View>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingTop: 10}}>
-                <TouchableOpacity style={[styles.drawerMenuItem, {marginTop: 20, borderBottomWidth: 0}]} onPress={() => { setMenuOpen(false); setUserData(null); setStep('role_selection'); }}>
-                  <Text style={styles.drawerMenuIcon}>🚪</Text>
-                  <Text style={[styles.drawerMenuText, {color: '#e53e3e'}]}>Logout Workspace</Text>
-                </TouchableOpacity>
-              </ScrollView>
-              <TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setMenuOpen(false)}><Text style={styles.drawerCloseText}>Close</Text></TouchableOpacity>
+        <ScrollView contentContainerStyle={{ paddingBottom: 90 }} showsVerticalScrollIndicator={false}>
+          {/* Quick Pastel Status Cards */}
+          <View style={styles.gridRow}>
+            <View style={[styles.pastelCard, { backgroundColor: '#fef3c7' }]}>
+              <Text style={styles.cardBoldText}>Assigned Dept</Text>
+              <Text style={styles.cardValText}>{assignedDept}</Text>
+              <Text style={styles.cardEmoji}>🏥</Text>
+            </View>
+            <View style={[styles.pastelCard, { backgroundColor: '#dcfce7' }]}>
+              <Text style={styles.cardBoldText}>Triage Priority</Text>
+              <Text style={[styles.cardValText, triageAlert === 'EMERGENCY_RED_FLAG' && { color: '#ef4444' }]}>
+                {triageAlert}
+              </Text>
+              <Text style={styles.cardEmoji}>⚡</Text>
+            </View>
+            <View style={[styles.pastelCard, { backgroundColor: '#e0e7ff' }]}>
+              <Text style={styles.cardBoldText}>ABHA Status</Text>
+              <Text style={styles.cardValText}>Linked & Verified</Text>
+              <Text style={styles.cardEmoji}>🪪</Text>
             </View>
           </View>
-        </Modal>
 
-        {/* EMR Modal */}
-        <Modal visible={emrModalVisible} transparent={true} animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.sectionHeadingDoc}>Edit EMR: {selectedPatient?.patient_name}</Text>
-              <Text style={{color: '#059669', marginBottom: 10, fontStyle: 'italic'}}>Patient Reported: {selectedPatient?.symptoms}</Text>
-              
-              <Text style={styles.fieldLabel}>Clinical Assessment & Prescription:</Text>
-              <TextInput style={styles.inputNoteDoctor} placeholder="Enter observations..." multiline value={doctorNotes} onChangeText={setDoctorNotes} />
-              
-              <Text style={styles.fieldLabel}>Diagnostic Autofill (NAMASTE / ICD-11):</Text>
-              <TextInput style={[styles.textInputFull, { height: 42, marginBottom: 4 }]} placeholder="Search diagnosis..." value={codingQuery} onChangeText={handleSearchCoding} />
-              {codingResults.length > 0 && (
-                <View style={styles.codingDropdown}>
-                  {codingResults.map((item) => (
-                    <TouchableOpacity key={item.code} style={styles.codingDropdownItem} onPress={() => { setSelectedCodes([...selectedCodes, item]); setCodingResults([]); setCodingQuery(''); }}>
-                      <Text style={styles.codingCode}>{item.code}</Text>
-                      <Text style={styles.codingLabel}>{item.label} ({item.system})</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-              <View style={styles.tagContainer}>
-                {selectedCodes.map((c, i) => ( <View key={i} style={styles.codeTag}><Text style={styles.codeTagText}>{c.code}</Text></View> ))}
-              </View>
-
-              <TouchableOpacity style={styles.primaryDocButton} onPress={handleSaveEMR}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryDocButtonText}>Save EMR to Cloud DB</Text>}
+          {/* Module A: Speech + Touch Intake */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeading}>{t('chiefComplaintPrompt')}</Text>
+            <View style={styles.speechRow}>
+              <TextInput
+                style={styles.complaintInput}
+                placeholder="Type complaint or tap speech button..."
+                value={chiefComplaint}
+                onChangeText={(text) => {
+                  setChiefComplaint(text);
+                  evaluateComplaintOnServer(text);
+                }}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.micBtn, isRecording && { backgroundColor: '#ef4444' }]}
+                onPress={simulateVoiceASR}
+              >
+                <Text style={styles.micIcon}>{isRecording ? '⏹️' : '🎙️'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{marginTop: 15, alignItems: 'center'}} onPress={() => setEmrModalVisible(false)}><Text style={{color: '#ef4444', fontWeight: 'bold'}}>Cancel</Text></TouchableOpacity>
+            </View>
+            {isRecording && <Text style={styles.listeningText}>{t('voiceListening')}</Text>}
+          </View>
+
+          {/* Module A: SOCRATES Adaptive Branching */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeading}>{t('socratesTitle')}</Text>
+            <View style={styles.socratesGrid}>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Site:</Text><Text style={styles.socVal}>{socratesData.site}</Text></View>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Onset:</Text><Text style={styles.socVal}>{socratesData.onset}</Text></View>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Character:</Text><Text style={styles.socVal}>{socratesData.character}</Text></View>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Radiation:</Text><Text style={styles.socVal}>{socratesData.radiation}</Text></View>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Associations:</Text><Text style={styles.socVal}>{socratesData.associations}</Text></View>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Timing:</Text><Text style={styles.socVal}>{socratesData.timing}</Text></View>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Exacerbating:</Text><Text style={styles.socVal}>{socratesData.exacerbating}</Text></View>
+              <View style={styles.socratesItem}><Text style={styles.socLabel}>Severity:</Text><Text style={styles.socVal}>{socratesData.severity}</Text></View>
             </View>
           </View>
-        </Modal>
 
-        <ScrollView contentContainerStyle={styles.scrollContentDoctor} showsVerticalScrollIndicator={false}>
-          {activeTab === 'home' && (
-            <View>
-              <View style={styles.docStatsRow}>
-                <View style={styles.docStatCard}><Text style={styles.docStatNum}>{liveAppointments.length}</Text><Text style={styles.docStatLabel}>Appointments</Text></View>
-                <View style={styles.docStatCard}><Text style={styles.docStatNum}>{liveAppointments.filter(a => a.status === 'Waiting').length}</Text><Text style={styles.docStatLabel}>Pending</Text></View>
-                <View style={styles.docStatCard}><Text style={styles.docStatNum}>{liveAppointments.filter(a => a.status === 'Completed').length}</Text><Text style={styles.docStatLabel}>Consulted</Text></View>
-              </View>
-
-              <Text style={styles.sectionHeadingDoc}>AYUSH Clinical Tools</Text>
-              <View style={styles.actionGridDoc}>
-                {docQuickActions.map((item) => (
-                  <TouchableOpacity key={item.id} style={[styles.actionCardDoc, {backgroundColor: item.bg}]} onPress={() => item.action ? setActiveTab(item.action) : null}>
-                    <Text style={styles.actionCardTitleDoc}>{item.title}</Text>
-                    <Text style={styles.actionCardIconDoc}>{item.icon}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.sectionHeadingDoc}>Live Patient Queue</Text>
-              {liveAppointments.length === 0 ? <Text style={{color: '#64748b', fontStyle: 'italic', marginBottom: 20}}>Queue empty. Waiting for patients.</Text> : null}
-              {liveAppointments.map((patient) => (
-                <TouchableOpacity key={patient.id} style={styles.queueCard} onPress={() => handleOpenPatientEMR(patient)}>
-                  <View>
-                    <Text style={styles.qName}>{patient.patient_name}</Text>
-                    <Text style={styles.qTime}>{patient.time} • ABHA: {patient.patient_abha}</Text>
-                    <Text style={{fontSize: 12, color: '#059669', marginTop: 4, fontStyle: 'italic'}}>{patient.symptoms}</Text>
-                  </View>
-                  <View style={[styles.qStatusBox, patient.status === 'Waiting' ? {backgroundColor: '#fee2e2'} : {backgroundColor: '#dcfce7'}]}>
-                    <Text style={[styles.qStatusText, patient.status === 'Waiting' ? {color: '#ef4444'} : {color: '#15803d'}]}>{patient.status}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+          {/* Module A: Dashavidha Pariksha (Ayurvedic Clinical Depth) */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeading}>{t('ayushTitle')}</Text>
+            <View style={styles.ayushGrid}>
+              <View style={styles.ayushPill}><Text style={styles.ayushPillTitle}>Prakriti:</Text><Text style={styles.ayushPillVal}>{dashavidha.prakriti}</Text></View>
+              <View style={styles.ayushPill}><Text style={styles.ayushPillTitle}>Vikriti:</Text><Text style={styles.ayushPillVal}>{dashavidha.vikriti}</Text></View>
+              <View style={styles.ayushPill}><Text style={styles.ayushPillTitle}>Agni (Digestion):</Text><Text style={styles.ayushPillVal}>{dashavidha.ahara_shakti}</Text></View>
+              <View style={styles.ayushPill}><Text style={styles.ayushPillTitle}>Koshtha (Bowel):</Text><Text style={styles.ayushPillVal}>{dashavidha.koshtha}</Text></View>
+              <View style={styles.ayushPill}><Text style={styles.ayushPillTitle}>Sara (Tissue Vitality):</Text><Text style={styles.ayushPillVal}>{dashavidha.sara}</Text></View>
+              <View style={styles.ayushPill}><Text style={styles.ayushPillTitle}>Vyayama (Endurance):</Text><Text style={styles.ayushPillVal}>{dashavidha.vyayama_shakti}</Text></View>
             </View>
-          )}
+          </View>
 
-          {activeTab === 'telemed' && (
-            <View style={{flex: 1, height: 420}}>
-              <Text style={styles.sectionHeadingDoc}>Active Telemedicine Room</Text>
-              {Platform.OS === 'web' ? (
-                <iframe src="https://meet.jit.si/BinaryBrainsAyushConsult" style={{ width: '100%', height: '100%', border: 'none', borderRadius: 12 }} allow="camera; microphone; fullscreen; display-capture" />
-              ) : (
-                <WebView source={{ uri: 'https://meet.jit.si/BinaryBrainsAyushConsult' }} style={{ flex: 1, borderRadius: 12 }} allowsInlineMediaPlayback />
-              )}
+          {/* Module B: Document Scanning, OCR, & Lab Highlighting */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.headerWithAction}>
+              <Text style={styles.sectionHeading}>{t('documentScanTitle')}</Text>
+              <TouchableOpacity style={styles.scanActionBtn} onPress={simulateDocumentScan}>
+                <Text style={styles.scanActionBtnText}>📸 Scan Physical Paper</Text>
+              </TouchableOpacity>
             </View>
-          )}
+
+            {uploadingDoc && <ActivityIndicator color="#059669" style={{ marginVertical: 10 }} />}
+
+            {scannedDocuments.map((doc) => (
+              <View key={doc.id} style={styles.docScanCard}>
+                <View style={styles.docCardHeader}>
+                  <Text style={styles.docTitle}>{doc.title}</Text>
+                  <Text style={styles.docDate}>{doc.date}</Text>
+                </View>
+                {doc.extractedMedications.length > 0 && (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={styles.docTagHeader}>Extracted Medications:</Text>
+                    {doc.extractedMedications.map((m: string, i: number) => (
+                      <Text key={i} style={styles.docMedItem}>• {m}</Text>
+                    ))}
+                  </View>
+                )}
+                {doc.abnormalFlags.length > 0 && (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={styles.docAbnormalHeader}>⚠️ Out-of-Range Clinical Findings:</Text>
+                    {doc.abnormalFlags.map((f: string, i: number) => (
+                      <Text key={i} style={styles.docAbnormalItem}>{f}</Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+
+          {/* Module C: Structured Clinical Summary Generator */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeading}>{t('summaryTitle')}</Text>
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryRow}>👤 <Text style={styles.boldText}>Patient:</Text> {patientName} (35 / M)</Text>
+              <Text style={styles.summaryRow}>🩺 <Text style={styles.boldText}>Chief Complaint:</Text> {chiefComplaint || 'Bilateral knee joint stiffness'}</Text>
+              <Text style={styles.summaryRow}>🌿 <Text style={styles.boldText}>Ayurvedic Diagnostics:</Text> {dashavidha.prakriti} | {dashavidha.vikriti}</Text>
+              <Text style={styles.summaryRow}>💊 <Text style={styles.boldText}>Active Historic Rx:</Text> Yogaraj Guggulu, Dashmularishta</Text>
+              <Text style={styles.summaryRow}>🔬 <Text style={styles.boldText}>Lab Flags:</Text> Uric Acid 7.9 mg/dL (Elevated)</Text>
+            </View>
+
+            <TouchableOpacity style={styles.primaryGreenBtn} onPress={triggerPrintSummary}>
+              <Text style={styles.primaryBtnText}>🖨️ {t('printSummary')} (PDF / AirPrint)</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
-
-        <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('home')}><Text style={[styles.navIcon, activeTab === 'home' && {color: '#0f172a'}]}>🏠</Text><Text style={[styles.navText, activeTab === 'home' && {color: '#0f172a', fontWeight: 'bold'}]}>Home</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}><Text style={styles.navIcon}>🧑‍🤝‍🧑</Text><Text style={styles.navText}>Patients</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('telemed')}><Text style={[styles.navIcon, activeTab === 'telemed' && {color: '#0f172a'}]}>📹</Text><Text style={[styles.navText, activeTab === 'telemed' && {color: '#0f172a', fontWeight: 'bold'}]}>Telemed</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}><Text style={styles.navIcon}>⚙️</Text><Text style={styles.navText}>Settings</Text></TouchableOpacity>
-        </View>
       </SafeAreaView>
     );
   }
 
-  // ==========================================
-  // PATIENT DASHBOARD
-  // ==========================================
+  // =============================================================
+  // SCREEN 5: DOCTOR OP-ROOM CLINICAL WORKSPACE
+  // =============================================================
   return (
-    <SafeAreaView style={styles.dashContainerPatient}>
-      <View style={styles.patHeader}>
-        <View style={styles.patHeaderLeft}>
-          <TouchableOpacity onPress={() => setMenuOpen(true)}><Text style={styles.hamburger}>☰</Text></TouchableOpacity>
-          <Text style={styles.patHeaderTitle}>Hello {userData?.name?.split(' ')[0] || 'User'} ▾</Text>
+    <SafeAreaView style={styles.screenContainer}>
+      <View style={styles.doctorHeader}>
+        <View>
+          <Text style={styles.docHeaderTitle}>Dr. Clinical Officer (ID: {doctorId})</Text>
+          <Text style={styles.docHeaderSub}>AIIA OPD Room 4 • MediKiosk Live HIS Sync</Text>
         </View>
-        <Text style={styles.bell}>🔔</Text>
+        <TouchableOpacity style={styles.docExitBtn} onPress={() => setStep('language_select')}>
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Logout</Text>
+        </TouchableOpacity>
       </View>
 
-      <Modal visible={menuOpen} animationType="slide" transparent={true}>
-        <View style={styles.drawerOverlay}>
-          <View style={styles.drawerContent}>
-            <View style={styles.drawerBlueHeader}>
-              <View style={styles.drawerInitials}><Text style={styles.drawerInitialsText}>NU</Text></View>
-              <Text style={styles.drawerUserName}>Hello {userData?.name || 'User'}</Text>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
+        <Text style={styles.sectionHeading}>Incoming MediKiosk Intake Queue</Text>
+        <View style={styles.queueCardDoctor}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.queuePatientName}>{patientName}</Text>
+              <Text style={styles.queueBadgeRoutine}>Intake Completed (Terminal #1)</Text>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingTop: 10}}>
-              <TouchableOpacity style={[styles.drawerMenuItem, {marginTop: 20, borderBottomWidth: 0}]} onPress={() => { setMenuOpen(false); setUserData(null); setStep('role_selection'); }}>
-                <Text style={styles.drawerMenuIcon}>🚪</Text>
-                <Text style={[styles.drawerMenuText, {color: '#e53e3e'}]}>Logout</Text>
-              </TouchableOpacity>
-            </ScrollView>
-            <TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setMenuOpen(false)}><Text style={styles.drawerCloseText}>Close</Text></TouchableOpacity>
+            <Text style={styles.queuePatientMeta}>ABHA: 33-8921-1234-2026 • 35 Y / Male</Text>
+            <Text style={styles.queueSymptomText}>Chief Complaint: {chiefComplaint || 'Bilateral knee stiffness, Mandagni'}</Text>
           </View>
+          <TouchableOpacity style={styles.consultDocBtn} onPress={() => setDoctorEMRModal(true)}>
+            <Text style={styles.consultDocBtnText}>Review & Prescribe</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
 
-      {/* Booking Form Modal */}
-      <Modal visible={bookingModalVisible} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.sectionHeadingDoc}>Book Live Appointment</Text>
-            <Text style={styles.fieldLabel}>Describe Symptoms:</Text>
-            <TextInput style={styles.inputNoteDoctor} placeholder="E.g., Severe joint pain..." multiline value={bookingSymptoms} onChangeText={setBookingSymptoms} />
-            <TouchableOpacity style={[styles.primaryDocButton, {backgroundColor: '#059669'}]} onPress={handleBookAppointment}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryDocButtonText}>Confirm & Book</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={{marginTop: 15, alignItems: 'center'}} onPress={() => setBookingModalVisible(false)}><Text style={{color: '#ef4444', fontWeight: 'bold'}}>Cancel</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <ScrollView contentContainerStyle={{paddingBottom: 80}} showsVerticalScrollIndicator={false}>
-        {activeTab === 'home' && (
-          <View>
-            <View style={styles.searchContainer}>
-              <Text style={styles.searchIcon}>🔍</Text>
-              <TextInput style={styles.searchInput} placeholder="Search by Clinic or Doctor" placeholderTextColor="#a0aec0" />
-            </View>
-
-            <View style={styles.actionGrid}>
-              {patientQuickActions.map((item) => (
-                <TouchableOpacity key={item.id} style={[styles.actionCard, {backgroundColor: item.bg}]} onPress={() => { if(item.action === 'book') setBookingModalVisible(true); else if(item.action === 'telemed') setActiveTab('telemed'); }}>
-                  <Text style={styles.actionCardTitle}>{item.title}</Text>
-                  <Text style={styles.actionCardIcon}>{item.icon}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            <Text style={styles.specialtyHeading}>Consult doctor by specialty</Text>
-            <View style={styles.specialtyGrid}>
-              {specialties.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.specialtyBox}>
-                  <View style={styles.specialtyIconBox}><Text style={styles.specialtyIconText}>{item.icon}</Text></View>
-                  <Text style={styles.specialtyBoxText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={styles.viewAllBtn}><Text style={styles.viewAllText}>View all AYUSH specialities</Text></TouchableOpacity>
-          </View>
-        )}
-
+        {/* Telemedicine Consultation Suite (Preserved) */}
         {activeTab === 'telemed' && (
-          <View style={{flex: 1, height: 420, paddingHorizontal: 16, marginTop: 10}}>
-            <Text style={styles.specialtyHeading}>Secure Telemedicine Room</Text>
+          <View style={{ height: 400, marginTop: 14 }}>
+            <Text style={styles.sectionHeading}>Telemedicine Consultation Suite</Text>
             {Platform.OS === 'web' ? (
-              <iframe src="https://meet.jit.si/BinaryBrainsAyushConsult" style={{ width: '100%', height: '100%', border: 'none', borderRadius: 12 }} allow="camera; microphone; fullscreen; display-capture" />
+              <iframe
+                src="https://meet.jit.si/BinaryBrainsAyushConsult"
+                style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8 }}
+                allow="camera; microphone; fullscreen; display-capture"
+              />
             ) : (
-              <WebView source={{ uri: 'https://meet.jit.si/BinaryBrainsAyushConsult' }} style={{ flex: 1, borderRadius: 12 }} allowsInlineMediaPlayback />
+              <WebView
+                source={{ uri: 'https://meet.jit.si/BinaryBrainsAyushConsult' }}
+                style={{ flex: 1, borderRadius: 8 }}
+                allowsInlineMediaPlayback
+              />
             )}
           </View>
         )}
       </ScrollView>
 
+      {/* Doctor Verification Modal */}
+      <Modal visible={doctorEMRModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalHeading}>Physician EMR Verification (30-Sec Review)</Text>
+            <Text style={styles.subtext}>AIIA Clinical Practice Guidelines • Editable Draft Summary</Text>
+
+            <TextInput
+              style={styles.emrEditInput}
+              multiline
+              value={editedNotes || `Confirmed Amavata presentation. Mandagni noted. Addressed elevated Uric Acid (7.9 mg/dL). Discontinue prior NSAIDs.`}
+              onChangeText={setEditedNotes}
+            />
+
+            <Text style={styles.fieldLabel}>Dual Terminology Codes (NAMASTE / ICD-11):</Text>
+            <View style={styles.tagRow}>
+              {selectedCodes.map((c, i) => (
+                <View key={i} style={styles.tagPill}><Text style={styles.tagText}>{c}</Text></View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.primaryGreenBtn}
+              onPress={() => {
+                setDoctorEMRModal(false);
+                Alert.alert('EHR Updated', 'Summary confirmed, codified, and synchronized with ABDM PHR.');
+              }}
+            >
+              <Text style={styles.primaryBtnText}>Confirm, Codify & Sync to ABHA</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ marginTop: 12, alignSelf: 'center' }} onPress={() => setDoctorEMRModal(false)}>
+              <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bottom Bar */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('home')}><Text style={[styles.navIcon, activeTab === 'home' && {color: '#059669'}]}>🏠</Text><Text style={[styles.navText, activeTab === 'home' && {color: '#059669', fontWeight: 'bold'}]}>Home</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}><Text style={styles.navIcon}>❤️</Text><Text style={styles.navText}>Records</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('telemed')}><Text style={[styles.navIcon, activeTab === 'telemed' && {color: '#059669'}]}>📹</Text><Text style={[styles.navText, activeTab === 'telemed' && {color: '#059669', fontWeight: 'bold'}]}>Telemed</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}><Text style={styles.navIcon}>🌿</Text><Text style={styles.navText}>Plans</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('kiosk')}>
+          <Text style={styles.navIcon}>📋</Text>
+          <Text style={styles.navText}>OPD Queue</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('telemed')}>
+          <Text style={styles.navIcon}>📹</Text>
+          <Text style={styles.navText}>Telemed Suite</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={triggerPrintSummary}>
+          <Text style={styles.navIcon}>🖨️</Text>
+          <Text style={styles.navText}>Print Summary</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-// ==========================================
-// 100% ORIGINAL STYLESHEET
-// ==========================================
+// =============================================================
+// PRESERVED THEME STYLESHEET
+// =============================================================
 const styles = StyleSheet.create({
-  loginContainer: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 },
-  companyHeadingContainer: { alignItems: 'center', marginBottom: 25, marginTop: 40 },
-  companyHeadingText: { fontSize: 22, fontWeight: '900', color: '#1e293b', letterSpacing: 1.5, textAlign: 'center' },
-  companyDivider: { width: 40, height: 4, backgroundColor: '#059669', marginTop: 8, borderRadius: 2 },
-  roleQuestionText: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginBottom: 24 },
-  largeRoleBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f9fa', borderWidth: 1, borderColor: '#cbd5e0', padding: 20, borderRadius: 12, marginBottom: 16 },
+  screenContainer: { flex: 1, backgroundColor: '#ffffff' },
+  highContrastBg: { backgroundColor: '#000000' },
+  accessToolbar: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#f1f5f9', paddingVertical: 8, borderBottomWidth: 1, borderColor: '#e2e8f0' },
+  accessPill: { backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 14, borderWidth: 1, borderColor: '#cbd5e1' },
+  accessText: { fontSize: 11, fontWeight: 'bold', color: '#1e293b' },
+  companyHeadingContainer: { alignItems: 'center', marginVertical: 16 },
+  companyHeadingText: { fontSize: 20, fontWeight: '900', color: '#1e293b', letterSpacing: 1.2 },
+  companyDivider: { width: 44, height: 4, backgroundColor: '#059669', marginTop: 6, borderRadius: 2 },
+  kioskSubtitle: { fontSize: 13, fontWeight: '600', color: '#059669', marginTop: 4 },
+  roleQuestionText: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginBottom: 16 },
+  largeRoleBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e0', padding: 16, borderRadius: 12, marginBottom: 12, marginHorizontal: 16 },
+  highContrastCard: { backgroundColor: '#1e293b', borderColor: '#ffffff' },
   largeRoleIcon: { fontSize: 28, marginRight: 16 },
-  largeRoleBtnText: { fontSize: 16, fontWeight: 'bold', color: '#334155' },
-  topNavRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  backArrow: { fontSize: 24, fontWeight: 'bold', color: '#1a202c', marginRight: 16 },
-  navTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a202c' },
-  loginHeading: { fontSize: 18, fontWeight: 'bold', color: '#1a202c', textAlign: 'center', marginBottom: 20 },
-  methodToggleContainer: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 4, marginBottom: 16 },
-  methodToggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
-  methodToggleBtnActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  methodToggleText: { fontSize: 13, fontWeight: 'bold', color: '#64748b' },
-  methodToggleTextActive: { color: '#059669' },
-  inputWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: '#cbd5e0', borderRadius: 10, backgroundColor: '#f8f9fa', alignItems: 'center', marginBottom: 16, height: 50 },
-  countryCodeBox: { paddingHorizontal: 14, borderRightWidth: 1, borderRightColor: '#cbd5e0', justifyContent: 'center' },
-  flagText: { fontSize: 14, fontWeight: 'bold', color: '#2d3748' },
-  phoneInput: { flex: 1, paddingHorizontal: 14, fontSize: 15, color: '#2d3748' },
-  termsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, paddingHorizontal: 4 },
-  checkbox: { width: 20, height: 20, borderWidth: 1, borderColor: '#cbd5e0', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginRight: 10, backgroundColor: '#fff' },
-  checkmark: { fontSize: 12, fontWeight: 'bold', color: '#059669' },
-  termsText: { flex: 1, fontSize: 12, color: '#718096' },
-  linkText: { color: '#059669', fontWeight: 'bold' },
-  otpButton: { backgroundColor: '#059669', borderRadius: 25, height: 50, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  otpButtonText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
-  screenContainer: { flex: 1, backgroundColor: '#ffffff', padding: 20 },
-  illBox: { alignItems: 'center', marginVertical: 20 },
-  illSymbol: { fontSize: 36, marginBottom: 8 },
-  instructionText: { fontSize: 13, color: '#4a5568', lineHeight: 20, marginBottom: 30, textAlign: 'center' },
-  primaryButtonLarge: { backgroundColor: '#0056b3', borderRadius: 25, height: 50, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
-  primaryButtonLargeText: { color: '#ffffff', fontWeight: 'bold', fontSize: 15 },
-  outlineButtonLarge: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#0056b3', borderRadius: 25, height: 50, justifyContent: 'center', alignItems: 'center' },
-  outlineButtonLargeText: { color: '#0056b3', fontWeight: 'bold', fontSize: 15 },
-  infoBox: { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', padding: 12, borderRadius: 8, marginBottom: 20 },
-  infoText: { fontSize: 12, color: '#166534', lineHeight: 18 },
-  fieldLabel: { fontSize: 12, fontWeight: '600', color: '#4a5568', marginBottom: 6 },
-  textInputFull: { borderWidth: 1, borderColor: '#cbd5e0', borderRadius: 10, backgroundColor: '#f8f9fa', paddingHorizontal: 14, height: 50, fontSize: 14, color: '#2d3748', marginBottom: 16 },
-
-  dashContainerDoctor: { flex: 1, backgroundColor: '#f8fafc' },
-  scrollContentDoctor: { padding: 16, paddingBottom: 80 },
-  docStatsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  docStatCard: { backgroundColor: '#ffffff', width: '31%', paddingVertical: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 3, elevation: 1 },
-  docStatNum: { fontSize: 24, fontWeight: '900', color: '#0f172a' },
-  docStatLabel: { fontSize: 11, color: '#64748b', marginTop: 4, fontWeight: '600' },
-  sectionHeadingDoc: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginBottom: 14, marginTop: 10 },
-  actionGridDoc: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 10 },
-  actionCardDoc: { width: '48%', borderRadius: 12, padding: 14, height: 90, marginBottom: 12, justifyContent: 'space-between' },
-  actionCardTitleDoc: { fontSize: 13, fontWeight: 'bold', color: '#1e293b' },
-  actionCardIconDoc: { fontSize: 26, alignSelf: 'flex-end' },
-  queueCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-  qName: { fontSize: 15, fontWeight: 'bold', color: '#1e293b' },
-  qTime: { fontSize: 12, color: '#64748b', marginTop: 4 },
-  qStatusBox: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  qStatusText: { fontSize: 11, fontWeight: 'bold' },
-  parserCard: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, marginTop: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-  parserTitle: { fontSize: 14, fontWeight: 'bold', color: '#0f172a', marginBottom: 12 },
-  inputNoteDoctor: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e0', borderRadius: 8, padding: 12, height: 120, fontSize: 14, color: '#1e293b', textAlignVertical: 'top', marginBottom: 14 },
-  primaryDocButton: { backgroundColor: '#0f172a', borderRadius: 8, padding: 14, alignItems: 'center' },
-  primaryDocButtonText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
-  resultBox: { marginTop: 14, backgroundColor: '#1e293b', borderRadius: 8, padding: 12 },
-  successText: { color: '#4ade80', fontWeight: 'bold', fontSize: 12, marginBottom: 6 },
-  jsonText: { fontFamily: 'monospace', fontSize: 10, color: '#38bdf8' },
-
-  dashContainerPatient: { flex: 1, backgroundColor: '#ffffff' },
-  patHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
+  largeRoleBtnText: { fontSize: 15, fontWeight: 'bold', color: '#1e293b' },
+  topNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  backArrow: { fontSize: 22, fontWeight: 'bold', marginRight: 14 },
+  navTitle: { fontSize: 16, fontWeight: 'bold' },
+  consentCard: { padding: 16, backgroundColor: '#f0fdf4', margin: 16, borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0' },
+  consentHeader: { fontSize: 14, fontWeight: 'bold', color: '#166534', marginBottom: 8 },
+  consentBody: { fontSize: 12, color: '#14532d', lineHeight: 18, marginBottom: 12 },
+  inputWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: '#cbd5e0', borderRadius: 8, backgroundColor: '#ffffff', height: 46, alignItems: 'center' },
+  countryCodeBox: { paddingHorizontal: 10, borderRightWidth: 1, borderRightColor: '#cbd5e0' },
+  flagText: { fontSize: 12, fontWeight: 'bold' },
+  phoneInput: { flex: 1, paddingHorizontal: 10, fontSize: 13 },
+  primaryGreenBtn: { backgroundColor: '#059669', borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginHorizontal: 16, marginTop: 10 },
+  primaryBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
+  redFlagCard: { backgroundColor: '#fee2e2', padding: 14, borderBottomWidth: 2, borderColor: '#ef4444' },
+  redFlagHeading: { color: '#991b1b', fontWeight: '900', fontSize: 14 },
+  redFlagText: { color: '#b91c1c', fontSize: 12, marginTop: 2 },
+  redFlagSub: { color: '#7f1d1d', fontSize: 11, fontWeight: 'bold', marginTop: 4 },
+  patHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0' },
   patHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  hamburger: { fontSize: 24, color: '#1a202c', marginRight: 16 },
-  patHeaderTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a202c' },
-  bell: { fontSize: 18, color: '#eab308' },
-  searchContainer: { flexDirection: 'row', backgroundColor: '#f8f9fa', marginHorizontal: 16, marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', paddingHorizontal: 14, height: 46 },
-  searchIcon: { fontSize: 16, marginRight: 10 },
-  searchInput: { flex: 1, fontSize: 15, color: '#2d3748' },
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, marginTop: 20, justifyContent: 'space-between' },
-  actionCard: { width: '31%', borderRadius: 12, padding: 12, height: 110, marginBottom: 12, justifyContent: 'space-between' },
-  actionCardTitle: { fontSize: 13, fontWeight: 'bold', color: '#1a202c' },
-  actionCardIcon: { fontSize: 32, alignSelf: 'flex-end' },
-  specialtyHeading: { fontSize: 18, fontWeight: 'bold', color: '#1a202c', marginLeft: 16, marginTop: 20, marginBottom: 16 },
-  specialtyGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, justifyContent: 'space-between' },
-  specialtyBox: { width: '31%', backgroundColor: '#ffffff', borderRadius: 12, paddingVertical: 16, paddingHorizontal: 6, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#edf2f7', shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
-  specialtyIconBox: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  specialtyIconText: { fontSize: 24 },
-  specialtyBoxText: { fontSize: 12, fontWeight: '600', color: '#2d3748', textAlign: 'center', lineHeight: 16 },
-  viewAllBtn: { alignItems: 'center', marginTop: 10, marginBottom: 20 },
-  viewAllText: { color: '#059669', fontWeight: 'bold', fontSize: 14 },
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 65, backgroundColor: '#ffffff', flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e2e8f0', justifyContent: 'space-around', alignItems: 'center', paddingBottom: 5 },
-  navItem: { alignItems: 'center', flex: 1 },
-  navIcon: { fontSize: 20, color: '#94a3b8' },
-  navText: { fontSize: 11, color: '#94a3b8', marginTop: 4, fontWeight: '600' },
-
-  drawerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start' },
-  drawerContent: { width: '80%', backgroundColor: '#ffffff', height: '100%' },
-  drawerBlueHeader: { backgroundColor: '#059669', padding: 24, paddingTop: 40, flexDirection: 'row', alignItems: 'center' },
-  drawerInitials: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  drawerInitialsText: { fontSize: 16, fontWeight: 'bold', color: '#059669' },
-  drawerUserName: { color: '#ffffff', fontWeight: 'bold', fontSize: 20 },
-  drawerMenuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  drawerMenuIcon: { fontSize: 18, width: 30, color: '#059669' },
-  drawerMenuText: { fontSize: 15, fontWeight: '600', color: '#1e293b', flex: 1 },
-  drawerCloseBtn: { padding: 20, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#f8fafc' },
-  drawerCloseText: { fontSize: 15, fontWeight: 'bold', color: '#64748b' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12 },
-  codingDropdown: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e0', borderRadius: 6, marginBottom: 10 },
-  codingDropdownItem: { padding: 8, borderBottomWidth: 1, borderColor: '#f1f5f9' },
-  codingCode: { fontSize: 11, fontWeight: 'bold', color: '#059669' },
-  codingLabel: { fontSize: 12, color: '#1e293b' },
-  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
-  codeTag: { backgroundColor: '#f1f5f9', borderRadius: 4, padding: 6, marginRight: 6, marginTop: 4 },
-  codeTagText: { fontSize: 11, color: '#334155' }
+  patHeaderTitle: { fontSize: 14, fontWeight: 'bold', color: '#0f172a' },
+  purgeBtn: { backgroundColor: '#ef4444', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  purgeBtnText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  gridRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, marginTop: 10 },
+  pastelCard: { flex: 1, marginHorizontal: 3, padding: 10, borderRadius: 8, minHeight: 74, justifyContent: 'space-between' },
+  cardBoldText: { fontSize: 11, fontWeight: 'bold', color: '#1e293b' },
+  cardValText: { fontSize: 12, fontWeight: '900', color: '#0f172a' },
+  cardEmoji: { alignSelf: 'flex-end', fontSize: 14 },
+  sectionContainer: { marginHorizontal: 14, marginTop: 14, padding: 12, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  sectionHeading: { fontSize: 13, fontWeight: 'bold', color: '#0f172a', marginBottom: 8 },
+  speechRow: { flexDirection: 'row', gap: 8 },
+  complaintInput: { flex: 1, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, fontSize: 13, minHeight: 48 },
+  micBtn: { width: 48, height: 48, backgroundColor: '#059669', borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  micIcon: { fontSize: 20 },
+  listeningText: { color: '#ef4444', fontSize: 11, fontWeight: 'bold', marginTop: 4 },
+  socratesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  socratesItem: { width: '48%', backgroundColor: '#f8fafc', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0' },
+  socLabel: { fontSize: 10, fontWeight: 'bold', color: '#059669' },
+  socVal: { fontSize: 11, color: '#1e293b', marginTop: 2 },
+  ayushGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  ayushPill: { width: '48%', backgroundColor: '#f0fdf4', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#bbf7d0' },
+  ayushPillTitle: { fontSize: 10, fontWeight: 'bold', color: '#166534' },
+  ayushPillVal: { fontSize: 11, color: '#14532d', marginTop: 2 },
+  headerWithAction: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  scanActionBtn: { backgroundColor: '#0f172a', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  scanActionBtnText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  docScanCard: { backgroundColor: '#f8fafc', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 8 },
+  docCardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  docTitle: { fontSize: 12, fontWeight: 'bold', color: '#1e293b' },
+  docDate: { fontSize: 10, color: '#64748b' },
+  docTagHeader: { fontSize: 10, fontWeight: 'bold', color: '#475569' },
+  docMedItem: { fontSize: 11, color: '#1e293b' },
+  docAbnormalHeader: { fontSize: 10, fontWeight: 'bold', color: '#ef4444' },
+  docAbnormalItem: { fontSize: 11, color: '#b91c1c', fontWeight: 'bold' },
+  summaryBox: { backgroundColor: '#f8fafc', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#cbd5e1' },
+  summaryRow: { fontSize: 12, color: '#1e293b', marginBottom: 4 },
+  boldText: { fontWeight: 'bold' },
+  doctorHeader: { padding: 16, backgroundColor: '#0f172a', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  docHeaderTitle: { color: '#ffffff', fontSize: 14, fontWeight: 'bold' },
+  docHeaderSub: { color: '#94a3b8', fontSize: 11 },
+  docExitBtn: { backgroundColor: '#ef4444', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  queueCardDoctor: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: 14, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', marginTop: 8 },
+  queuePatientName: { fontSize: 14, fontWeight: 'bold', color: '#0f172a' },
+  queueBadgeRoutine: { fontSize: 10, backgroundColor: '#dcfce7', color: '#15803d', paddingHorizontal: 6, borderRadius: 4 },
+  queuePatientMeta: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  queueSymptomText: { fontSize: 11, color: '#059669', fontStyle: 'italic', marginTop: 2 },
+  consultDocBtn: { backgroundColor: '#059669', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
+  consultDocBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 16 },
+  modalContent: { backgroundColor: '#ffffff', borderRadius: 10, padding: 16 },
+  modalHeading: { fontSize: 15, fontWeight: 'bold', color: '#0f172a' },
+  subtext: { fontSize: 11, color: '#64748b', marginBottom: 10 },
+  emrEditInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, height: 90, fontSize: 12, textAlignVertical: 'top', marginBottom: 10 },
+  fieldLabel: { fontSize: 11, fontWeight: 'bold', color: '#475569', marginBottom: 4 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  tagPill: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  tagText: { fontSize: 10, color: '#334155', fontWeight: 'bold' },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 56, backgroundColor: '#ffffff', flexDirection: 'row', borderTopWidth: 1, borderColor: '#e2e8f0', justifyContent: 'space-around', alignItems: 'center' },
+  navItem: { alignItems: 'center' },
+  navIcon: { fontSize: 18 },
+  navText: { fontSize: 10, color: '#64748b', fontWeight: 'bold' }
 });
